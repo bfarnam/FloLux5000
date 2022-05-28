@@ -20,7 +20,7 @@ Optional Single Rotary Button Encoder
 
 ### Zero Cross vs Phase Angle vs Solid State Voltage Regulator (SSVR) vs Digital Solid State Power Regulator... uh what?
 There are many different ways of controlling AC output and I will explain briefly here the 20,000 foot overview.  Auber Instruments has a LOT of info on thier website on this.  
-Source: https://www.auberins.com/images/Manual/EZboil_talkv1.1.pdf
+Source: https://www.auberins.com/images/Manual/EZboil_talkv1.1.pdf and https://www.auberins.com/index.php?main_page=page&id=10#q5
 
 #### Zero Cross
 The most common method of turning On and Off a high voltage AC load is using just a plain old Zero Cross SSR.  The SSR will only turn on or off when the AC sign wave crosses the 0v line - hence Zero Cross.  I won't get into the specifics, but many Commercial Off The Shelf (COTS) PID units when utilizing a Zero Cross SSR cycle on and off in 2 second intervals using a technique called Burst Mode.  
