@@ -37,6 +37,8 @@
 */
 
 /*
+ * Note that on 60Hz power lines a half cycle is 8.35mSec. while a 50Hz system is 10mSec. 
+ * 
  * The burst firing mode is preferred for resistive loads, which can provide a uniform power output 
  * to the heater and can extend the life time of the heater. The firing signal is a series of short
  * pulses distributed over one hundred AC line cycles. The duration of each pulse equals to one AC
