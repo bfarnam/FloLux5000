@@ -4,6 +4,7 @@
 I decided to convert an old 1500w Cuisinart convection oven into a proper reflow oven.  I have been using it in "manual" mode with two thermocouples for several years now and decided to take the plunge.  
 
 ## 05/28/2022 - WORK IN PROGRESS
+I am in the process of the build and working out the code as of this moment.  The code is "user beware" and "not complete" as I go through my development and debug cycle.  You have been warned.
 
 ### Requirements
 Independent control of Top and Bottom Elements - using i2c  
@@ -79,4 +80,8 @@ Requires an Interrupt to detect Zero Cross and therefor is not compatible with i
 Requires that the "phase" of the AC voltage be known.  
 Requires the "mass" of the load and the "resistance" of the load to temperature change in order to calculate the rate of temperature change based upon the wattage of the heating elements.  
 Could not find any reflow examples, probably because the mass and resistance are usually unknown  
+
+### A note on i2c and Interrupts
+Generally, i2c is not compatible with ISRs that rely on interrrupts becuase the I2C calls rely on interrupts.  When i2c is activaely communicating, the Wire.h (or the twi library, I can't remember at the moment) disables all interrupts, which would then disable zero-cross detection.  And since i2c when used for temperature reads, will constantly disable and re-enable the interupts, it is possible that the Zero Cross could be missed.  There are a lot of discussions and information on the various Arduino, AVR, and Embedded boards about this.
+
 
