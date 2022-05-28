@@ -44,9 +44,9 @@
 
 // ###### EDIT THE PIN NUMBERS IN THE 3 LINES FOLLOWING TO SUIT YOUR SETUP ######
 
-#define TFT_CS   10  // Chip select control pin
-#define TFT_DC   8  // Data Command control pin
-#define TFT_RST  7  // Reset pin (could connect to Arduino RESET pin)
+//#define TFT_CS   10  // Chip select control pin
+//#define TFT_DC   9  // Data Command control pin
+//#define TFT_RST  7  // Reset pin (could connect to Arduino RESET pin)
 
 
 // ##################################################################################
@@ -59,7 +59,7 @@
 // this next line will speed up rendering x5, code size will increase 136 bytes
 // Only worth it if you print lots of GLCD font text...
 
-#define FAST_GLCD
+//#define FAST_GLCD
 
 // Uncomment the following #define to invoke a 20% faster drawLine() function
 // This speeds up other funtions such as triangle outline drawing too

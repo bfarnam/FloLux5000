@@ -10,7 +10,10 @@
 
 #include "type_defs.hpp"
 #include "hwSetup.hpp"
-#include "crc8.hpp"
+#include "lib/crc8.hpp"
+#include "lib/TFT_ILI9334.h"
+
+#include <EEPROMEx.h>
 
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_I2CRegister.h>
@@ -23,7 +26,6 @@ Adafruit_MCP9600 mcp;
     #define bitToggle(value, bit) ((value) ^= (1UL << (bit)))
 #endif
 
-//Define Variables we'll be connecting to
 uint16_t _tSetPoint, _Output;
 float _tInput;
 

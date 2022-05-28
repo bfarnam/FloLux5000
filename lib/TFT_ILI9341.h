@@ -16,10 +16,10 @@
  ****************************************************/
 
 // Include header file that defines the fonts loaded and the pins to be used
-#include <User_Setup.h>
+#include "User_Setup.h"
 
 // Include header file from the FastLED library for fast pin toggling using direct port access
-#include <TFT_FastPin.h>
+#include "TFT_FastPin.h"
 
 // Stop fonts being loaded multiple times
 #ifndef _TFT_ILI9341H_

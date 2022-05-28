@@ -15,25 +15,24 @@ enum eSysFaultBits:uint8_t {
 
 // data type for the values used in the reflow profile
 typedef struct profileValues_s {
-  int16_t soakTemp;
+  uint8_t soakTemp;
   int16_t soakDuration;
-  int16_t peakTemp;
+  uint8_t peakTemp;
   int16_t peakDuration;
   double  rampUpRate;
   double  rampDownRate;
   uint8_t checksum;
 } Profile_t;
 
-typedef enum REFLOW_STATE
-{
-  REFLOW_STATE_IDLE,
-  REFLOW_STATE_PREHEAT,
-  REFLOW_STATE_SOAK,
-  REFLOW_STATE_REFLOW,
-  REFLOW_STATE_COOL,
-  REFLOW_STATE_COMPLETE,
-  REFLOW_STATE_TOO_HOT,
-  REFLOW_STATE_ERROR
+typedef enum reflowState_e:uint8_t {
+    reflowIdle,
+    reflowPreheat,
+    reflowSoak,
+    reflowNow,
+    reflowCool,
+    reflowComplete,
+    reflowOverHeat,
+    reflowError
 } reflowState_t;
 
 
