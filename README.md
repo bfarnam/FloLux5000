@@ -19,7 +19,7 @@ Optional door opener
 Optional Single Rotary Button Encoder  
 
 ### Zero Cross vs Phase Angle vs Solid State Voltage Regulator (SSVR) vs Digital Solid State Power Regulator... uh what?
-There are many different ways of controlling AC output and I will explain briefly here the 20,000 foot overview.  Auber Instruments has a LOT of info on thier website on this.
+There are many different ways of controlling AC output and I will explain briefly here the 20,000 foot overview.  Auber Instruments has a LOT of info on thier website on this.  
 Source: https://www.auberins.com/images/Manual/EZboil_talkv1.1.pdf
 
 #### Zero Cross
