@@ -24,6 +24,20 @@
 #ifndef _Adafruit_SSD1306_H_
 #define _Adafruit_SSD1306_H_
 
+// invoking twice fails when using the new constructor when
+// using an array to invoke the library twice
+// THIS DOES NOT WORK
+//Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
+
+// THIS WORKS - BUT screws up the display size
+//Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(), Adafruit_SSD1306() };
+
+// changing to SSD1306_128_64 fails when using 128x64 oled AND invoking twice
+// using the old constructor - so you have to offset the text AND manually
+// scale the fonts.
+
+
+
 // ONE of the following three lines must be #defined:
 //#define SSD1306_128_64 ///< DEPRECTAED: old way to specify 128x64 screen
 #define SSD1306_128_32 ///< DEPRECATED: old way to specify 128x32 screen

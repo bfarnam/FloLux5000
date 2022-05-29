@@ -330,7 +330,7 @@ Adafruit_SSD1306::Adafruit_SSD1306(int8_t rst_pin)
     : Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT), spi(NULL), wire(&Wire),
       buffer(NULL), mosiPin(-1), clkPin(-1), dcPin(-1), csPin(-1),
       rstPin(rst_pin), wireClk(400000UL) {}
-
+// ADDED wireClk above to force high speed using the old constructor
 /*!
     @brief  Destructor for Adafruit_SSD1306 object.
 */
