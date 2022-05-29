@@ -1,14 +1,14 @@
 #include <Arduino.h>
 #include <Wire.h>
-//#include "lib/CA9500.hpp"
-//CA9500 _i2c;
+#include "lib/CA9500.hpp"
+CA9500 _i2c;
 
 #include "lib/PID_v2.h"
 
 #include "type_defs.hpp"
 #include "hwSetup.hpp"
 #include "lib/crc8.hpp"
-#include "lib/TFT_ILI9334.h"
+#include "lib/TFT_ILI9341.h"
 
 #include <EEPROMEx.h>
 
@@ -27,7 +27,7 @@ Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire
 Adafruit_MCP9600 mcp;
 
 // set mcp address
-#define mcpHex (0x67)
+const uint8_t mcpHex (0x67);
 
 #ifndef bitToggle
     #define bitToggle(value, bit) ((value) ^= (1UL << (bit)))
@@ -52,6 +52,12 @@ PID_v2 reflowPID(consKp, consKi, consKd, PID::Direct);
 void setup()
 {
     _timeStart = millis();
+
+    _i2c.begin(0x27, Wire);
+    uint8_t pMode[8] = {OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
+    _i2c.pinMode(pMode);
+    pMode = {LOW,LOW,LOW,LOW,LOW,LOW,LOW,LOW};
+    _i2c.digitalWrite(pMode);
 
     // SSD1306_SWITCHCAPVCC = generate oled voltage from 3.3V internally
     oled[0].begin(SSD1306_SWITCHCAPVCC, 0x3c);
@@ -112,11 +118,17 @@ void loop()
 
     if (millis() - _timeStart >= _Output ) {
             // heater on
+            _i2c.digitalWrite(0,HIGH);
+            _i2c.digitalWrite(1,HIGH);
     } else {
             // heater off
+            _i2c.digitalWrite(0,LOW);
+            _i2c.digitalWrite(1,LOW);
     }
 
 }
+
+
 void oledSetCursorCenterMode(String _text, uint8_t _instance=0, uint8_t _mode=0, int8_t _horOffset=0, int8_t _verOffset=0 );
 void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int8_t _horOffset, int8_t _verOffset ) {
     int16_t x1;
@@ -146,7 +158,7 @@ void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int
             oled[_instance].setCursor( 0, ((SCREEN_HEIGHT - height) / 2)-verOffset );
             return;
         default:
-            //full center
+            // full center
             oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2)-horOffset, ((SCREEN_HEIGHT - height) / 2)-verOffset );
             return;
      }
