@@ -12,20 +12,20 @@ CA9500 _i2c;
 
 //#include <EEPROMEx.h>
 
-#include "Adafruit_SSD1306.h"
+#include <Adafruit_SSD1306.h>
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#define SCREEN_WIDTH 64
+#define SCREEN_HEIGHT 32
 #define OLED_RESET    -1
 
 const uint8_t oAddr[2] = {0x3c, 0x3d};
 
 // The adafruit library is messed up and you can't substantiate two seperate oleds using the new constructors into an array
-//Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
+Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
 // the workaround is to use the old constructor, but you can't set to 128x63 or it fails.
 // so the other workaround is to leave it set to 128x64 and then scale the fonts mannually x and y
 // and then you have to modify the library and manuualy set the i2c speed to 400k.... this cost me MANY hours to debug
-Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(), Adafruit_SSD1306() };
+//Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(), Adafruit_SSD1306() };
 
 // font x and y scaling
 uint8_t _tSizeX;
@@ -62,14 +62,18 @@ uint16_t _timeStart;
 
 //Specify the links and initial tuning parameters
 //PID_v2 reflowPID(Kp, Ki, Kd, PID::Direct);
-PID_v2 reflowPID(consKp, consKi, consKd, PID::Direct);
+//PID_v2 reflowPID(consKp, consKi, consKd, PID::Direct);
+PID reflowPID(&_tInput, &_Output, &_tSetPoint, consKp, consKi, consKd, DIRECT);
 
 const uint8_t SW_DEBUG = true;
+uint8_t page_count = 0;
 
 void setup()
 {
     if (SW_DEBUG) Serial.begin(115200);
-
+Serial.print(F("Free Ram @start is "));
+Serial.println( freeRam() );
+        
     _i2c.begin(0x27, Wire);
     bool pMode[8] = {OUTPUT,OUTPUT,OUTPUT,INPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
     _i2c.pinMode(pMode);
@@ -98,7 +102,8 @@ void setup()
     }
     // give you time to read the numbers....
     delay(2000);
-    
+Serial.print(F("Free Ram after OLED is "));
+Serial.println( freeRam() );
     //if ( not mcp.begin(mcpHex) ) { bitSet(vSystemFaultBit,eSysFaultBits::mcpFault); }
     if ( not mcp.begin(mcpHex) ) { 
       if (SW_DEBUG) Serial.println(F("mcp instance FAILED"));
@@ -111,23 +116,19 @@ void setup()
     mcp.setThermocoupleType(MCP9600_TYPE_K);
     mcp.setFilterCoefficient(3);
     mcp.enable(true);
-
+Serial.print(F("Free Ram after MCP is "));
+Serial.println( freeRam() );
     // define the sample time window ms
     _timeWindow = 500;
     
     // tell the PID to range between 0 and sample time window
     // this will get converted to a proportional on off by time
     reflowPID.SetOutputLimits(0, _timeWindow);
-
+Serial.print(F("Free Ram after OUTPUTLIMITS is "));
+Serial.println( freeRam() );
     // get the first temp read after a delay of 1000ms to stabilize the thermocouple
     delay(1000);
     _tInput = mcp.readThermocouple();
-        
-        Serial.print(F("_tInput "));
-        Serial.print(F("\t_tGap "));
-        Serial.print(F("\t_Output "));
-        Serial.print(F("\t_tSetPoint "));
-        Serial.println(F("\t_timeStart "));
         
     //if (SW_DEBUG) debug_out();
 /*
@@ -145,15 +146,17 @@ void setup()
     _tSetPoint = 25;
     
     // then start the PID with the parameters
-    reflowPID.Start(_tInput, _Output, _tSetPoint);
+    //reflowPID.Start(_tInput, _Output, _tSetPoint);
+    reflowPID.SetMode(AUTOMATIC);
+Serial.print(F("Free Ram @ END OF SETUP is "));
+Serial.println( freeRam() );
 }
 
 void loop()
 {
     _tInput = mcp.readThermocouple();
     
-    _tGap = abs(reflowPID.GetSetpoint() - _tInput);
-    //_tGap = abs(_tSetPoint - _tInput);
+    _tGap = abs(_tSetPoint - _tInput);
 
     if ( _tGap < 10 ) {
         // we're close to setpoint, use conservative tuning parameters
@@ -165,8 +168,8 @@ void loop()
         reflowPID.SetTunings(aggKp, aggKi, aggKd);
     }
 
-    _Output = reflowPID.Run(_tInput);
-    //reflowPID.Compute();
+    //_Output = reflowPID.Run(_tInput);
+    reflowPID.Compute();
 
     DisplayTemp("TEMP", String(_tInput), 4, 3, 0);
     //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
@@ -180,17 +183,17 @@ void loop()
     if (SW_DEBUG) debug_out();
 
     if (millis() - _timeStart >= _Output ) {
-            // heater off
-            _i2c.digitalWrite(0,LOW);
-            _i2c.digitalWrite(1,LOW);
-            //DisplayTemp("OUTPUT", "OFF", 4, 3, 1);
-            DisplayTemp("OFF", String(_Output), 4, 3, 1);
-    } else {
             // heater on
 //            _i2c.digitalWrite(0,HIGH);
 //            _i2c.digitalWrite(1,HIGH);
             //DisplayTemp("OUTPUT", "ON", 4, 3, 1);
             DisplayTemp("ON", String(_Output), 4, 3, 1);
+    } else {
+            // heater off
+//            _i2c.digitalWrite(0,LOW);
+//            _i2c.digitalWrite(1,LOW);
+            //DisplayTemp("OUTPUT", "OFF", 4, 3, 1);
+            DisplayTemp("OFF", String(_Output), 4, 3, 1);
     }
 
 }
@@ -200,14 +203,25 @@ void debug_out()
     static uint32_t last_out;
     if (millis() - last_out >= 300) {
         last_out = millis();
+        if ( page_count == 25 ) {
+            page_count = 1;
+            Serial.print(F("Free Ram is "));
+            Serial.println( freeRam() );
+            Serial.print(F("_tInput "));
+            Serial.print(F("\t_tGap "));
+            Serial.print(F("\t\t_Output "));
+            Serial.print(F("\t_tSetPoint "));
+            Serial.println(F("\t_timeStart "));
+        }
+        page_count ++;
         Serial.print(String(_tInput));
-        Serial.print(F("\t"));
+        Serial.print(F("\t\t"));
         Serial.print(String(_tGap));
-        Serial.print(F("\t"));
+        Serial.print(F("\t\t"));
         Serial.print(String(_Output));
-        Serial.print(F("\t"));
+        Serial.print(F("\t\t"));
         Serial.print(String(_tSetPoint));
-        Serial.print(F("\t"));
+        Serial.print(F("\t\t"));
         Serial.println(String(_timeStart));
     }
 }
@@ -277,4 +291,11 @@ void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int
             oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2) - _horizontalOffset, ((SCREEN_HEIGHT - height) / 2) - _verticalOffset );
             return;
      }
+}
+
+uint16_t freeRam()
+{
+    extern uint16_t __heap_start, *__brkval;
+    uint8_t v;
+    return (uint16_t) &v - (__brkval == 0 ? (uint16_t) &__heap_start : (uint16_t) __brkval);
 }
