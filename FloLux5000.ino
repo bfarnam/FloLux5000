@@ -3,7 +3,7 @@
 #include "CA9500.hpp"
 CA9500 _i2c;
 
-#include "PID_v2.h"
+#include <PID_v1.h>
 
 #include "type_defs.hpp"
 #include "hwSetup.hpp"
@@ -57,7 +57,7 @@ double aggKp = 4.0, aggKi = 0.2, aggKd = 1.0;
 double consKp = 1.0, consKi = 0.05, consKd = 0.25;
 
 // set the time proportional settings
-const uint16_t _timeWindow = 1000; // ms
+uint16_t _timeWindow; // ms
 uint16_t _timeStart;
 
 //Specify the links and initial tuning parameters
@@ -69,14 +69,13 @@ const uint8_t SW_DEBUG = true;
 void setup()
 {
     if (SW_DEBUG) Serial.begin(115200);
-    _timeStart = millis();
-/*
+
     _i2c.begin(0x27, Wire);
     bool pMode[8] = {OUTPUT,OUTPUT,OUTPUT,INPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
     _i2c.pinMode(pMode);
     bool pState[8] = {LOW,LOW,LOW,LOW,LOW,LOW,LOW,LOW};
     _i2c.digitalWrite(pState);
-*/
+
     // SSD1306_SWITCHCAPVCC = generate oled voltage from 3.3V internally
     // initiate the oleds and display thier number on the screen
     for (uint8_t x = 0; x < 2; x++) {
@@ -105,25 +104,32 @@ void setup()
       if (SW_DEBUG) Serial.println(F("mcp instance FAILED"));
       while(1);
     }
+    if (SW_DEBUG) Serial.println(F("mcp found"));
+    
     //mcp.begin(mcpHex);
     mcp.setADCresolution(MCP9600_ADCRESOLUTION_18);
     mcp.setThermocoupleType(MCP9600_TYPE_K);
     mcp.setFilterCoefficient(3);
     mcp.enable(true);
 
-    // tell the PID to range between 0 and the full window size
+    // define the sample time window ms
+    _timeWindow = 500;
+    
+    // tell the PID to range between 0 and sample time window
+    // this will get converted to a proportional on off by time
     reflowPID.SetOutputLimits(0, _timeWindow);
 
     // get the first temp read after a delay of 1000ms to stabilize the thermocouple
     delay(1000);
     _tInput = mcp.readThermocouple();
-
-    // set the first set point for testing
-    _tSetPoint = 25;
-    
-    // then start the PID with the parameters
-    reflowPID.Start(_tInput, _Output, _tSetPoint);
-    //reflowPID.SetMode(AUTOMATIC);
+        
+        Serial.print(F("_tInput "));
+        Serial.print(F("\t_tGap "));
+        Serial.print(F("\t_Output "));
+        Serial.print(F("\t_tSetPoint "));
+        Serial.println(F("\t_timeStart "));
+        
+    //if (SW_DEBUG) debug_out();
 /*
     // this is test code
     while(1) { 
@@ -132,64 +138,82 @@ void setup()
         _tInput += 1.1;
     }
 */
+
+    // for debug testing we assusme we are in reflow
+    _timeStart = millis();
+    // test to preheat C
+    _tSetPoint = 25;
+    
+    // then start the PID with the parameters
+    reflowPID.Start(_tInput, _Output, _tSetPoint);
 }
 
 void loop()
 {
     _tInput = mcp.readThermocouple();
+    
     _tGap = abs(reflowPID.GetSetpoint() - _tInput);
     //_tGap = abs(_tSetPoint - _tInput);
-    if (SW_DEBUG) {
-        Serial.print(F("_tInput "));
-        Serial.print(String(_tInput));
-        Serial.print(F("\t_tGap "));
-        Serial.println(String(_tGap));
-    }
 
     if ( _tGap < 10 ) {
         // we're close to setpoint, use conservative tuning parameters
-        if (SW_DEBUG) Serial.println(F("Using conservative tuning parameters"));
+        //if (SW_DEBUG) Serial.println(F("Using conservative tuning parameters"));
         reflowPID.SetTunings(consKp, consKi, consKd);
     } else {
         // we're far from setpoint, use aggressive tuning parameters
-        if (SW_DEBUG) Serial.println(F("Using aggressive tuning parameters"));
+        //if (SW_DEBUG) Serial.println(F("Using aggressive tuning parameters"));
         reflowPID.SetTunings(aggKp, aggKi, aggKd);
     }
 
     _Output = reflowPID.Run(_tInput);
     //reflowPID.Compute();
-    if (SW_DEBUG) {
-        Serial.print(F("_Output "));
-        Serial.print(String(_Output));
-        Serial.print(F("\_timeWindow "));
-        Serial.println(String(_timeWindow));
-    }
 
     DisplayTemp("TEMP", String(_tInput), 4, 3, 0);
     //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
 
-    
     // adjust time until it is time
     while (millis() - _timeStart >= _timeWindow) {
-        // time to shift the Relay Window
+        // time to shift the time Window
         _timeStart += _timeWindow;
     }
 
-    //if (millis() - _timeStart <= _Output ) {
-    if (_Output < millis() - _timeStart) {
+    if (SW_DEBUG) debug_out();
+
+    if (millis() - _timeStart >= _Output ) {
+            // heater off
+            _i2c.digitalWrite(0,LOW);
+            _i2c.digitalWrite(1,LOW);
+            //DisplayTemp("OUTPUT", "OFF", 4, 3, 1);
+            DisplayTemp("OFF", String(_Output), 4, 3, 1);
+    } else {
             // heater on
 //            _i2c.digitalWrite(0,HIGH);
 //            _i2c.digitalWrite(1,HIGH);
-            DisplayTemp("OUTPUT", "ON", 4, 3, 1);
-            //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
-    } else {
-            // heater off
-//            _i2c.digitalWrite(0,LOW);
-//            _i2c.digitalWrite(1,LOW);
-            DisplayTemp("OUTPUT", "OFF", 4, 3, 1);
-            //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
+            //DisplayTemp("OUTPUT", "ON", 4, 3, 1);
+            DisplayTemp("ON", String(_Output), 4, 3, 1);
     }
 
+}
+
+void debug_out()
+{
+    static uint32_t last_out;
+    if (millis() - last_out >= 300) {
+        last_out = millis();
+        Serial.print(String(_tInput));
+        Serial.print(F("\t"));
+        Serial.print(String(_tGap));
+        Serial.print(F("\t"));
+        Serial.print(String(_Output));
+        Serial.print(F("\t"));
+        Serial.print(String(_tSetPoint));
+        Serial.print(F("\t"));
+        Serial.println(String(_timeStart));
+    }
+}
+void heaterON(double _ouput, uint16_t _window)
+{
+    
 }
 
 void DisplayTemp(String _banner, String _temp, uint8_t _sizeX, uint8_t _sizeY, uint8_t _instance) {
