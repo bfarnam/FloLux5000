@@ -1,16 +1,16 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include "lib/CA9500.hpp"
+#include "CA9500.hpp"
 CA9500 _i2c;
 
-#include "lib/PID_v2.h"
+#include "PID_v2.h"
 
 #include "type_defs.hpp"
 #include "hwSetup.hpp"
 #include "lib/crc8.hpp"
 #include "lib/TFT_ILI9341.h"
 
-#include <EEPROMEx.h>
+//#include <EEPROMEx.h>
 
 #include <Adafruit_SSD1306.h>
 
@@ -20,6 +20,8 @@ CA9500 _i2c;
 
 Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET),
                              Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
+// set default temperature size
+uint8_t _tSize = 4;
 
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_I2CRegister.h>
@@ -34,12 +36,12 @@ const uint8_t mcpHex (0x67);
 #endif
 
 // set the temp and output variables
-float _tInput = 0, _tSetPoint = 150, _Output = 0, _tGap = 0;
+double _tInput = 0, _tSetPoint = 150, _Output = 0, _tGap = 0;
 
 // Define the standard, aggressive, and conservative Tuning Parameters
-float Kp = 2.0, Ki = 5.0, Kd = 1.0;
-float aggKp = 4.0, aggKi = 0.2, aggKd = 1.0;
-float consKp = 1.0, consKi = 0.05, consKd = 0.25;
+double Kp = 2.0, Ki = 5.0, Kd = 1.0;
+double aggKp = 4.0, aggKi = 0.2, aggKd = 1.0;
+double consKp = 1.0, consKi = 0.05, consKd = 0.25;
 
 // set the time proportional settings
 const uint16_t _timeWindow = 5000; // ms
@@ -54,10 +56,10 @@ void setup()
     _timeStart = millis();
 
     _i2c.begin(0x27, Wire);
-    uint8_t pMode[8] = {OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
+    bool pMode[8] = {OUTPUT,OUTPUT,OUTPUT,INPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
     _i2c.pinMode(pMode);
-    pMode = {LOW,LOW,LOW,LOW,LOW,LOW,LOW,LOW};
-    _i2c.digitalWrite(pMode);
+    bool pState[8] = {LOW,LOW,LOW,LOW,LOW,LOW,LOW,LOW};
+    _i2c.digitalWrite(pState);
 
     // SSD1306_SWITCHCAPVCC = generate oled voltage from 3.3V internally
     oled[0].begin(SSD1306_SWITCHCAPVCC, 0x3c);
@@ -72,27 +74,24 @@ void setup()
     mcp.enable(true);
 
     // tell the PID to range between 0 and the full window size
-    myPID.SetOutputLimits(0, _timeWindow);
+    reflowPID.SetOutputLimits(0, _timeWindow);
 
     // get the first temp read after a delay of 5000ms to stabilize the thermocouple
     // then start the PID with the parameters
     delay(5000);
     _tInput = mcp.readThermocouple();
     reflowPID.Start(_tInput, _Output, _tSetPoint);
-    while(1) {
+ 
     // Clear the buffer
-            oled[0].clearDisplay();
-            oled[0].setTextSize(2);
-            oled[0].setTextSize(3,2);
-            oled[0].setTextColor(SSD1306_WHITE);
-            //oled[0].setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            oled[0].setCursor(0,0);
-    oledSetCursorCenterMode(_tInput, 1, 1, 0, -10);
-    oled[0].println(_tInput);
+    oled[0].clearDisplay();
+    //oled[0].setTextSize(2);
+    oled[0].setTextSize(3,2);
+    oled[0].setTextColor(SSD1306_WHITE);
+    //oled[0].setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    oled[0].setCursor(0,0);
+    oledSetCursorCenterMode(String(_tInput), 1, 1, 0, -10);
+    oled[0].println(String(_tInput));
     oled[0].display();
-    delay(1000);
-    }
-
 }
 
 void loop()
@@ -130,6 +129,7 @@ void loop()
 
 
 void oledSetCursorCenterMode(String _text, uint8_t _instance=0, uint8_t _mode=0, int8_t _horOffset=0, int8_t _verOffset=0 );
+
 void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int8_t _horOffset, int8_t _verOffset ) {
     int16_t x1;
     int16_t y1;
@@ -151,15 +151,15 @@ void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int
     switch (_mode) {
         case 1:
             // horizontal only
-            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2)-horOffset, 0);
+            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2)-_horOffset, 0);
             return;
         case 2:
             // vertical only
-            oled[_instance].setCursor( 0, ((SCREEN_HEIGHT - height) / 2)-verOffset );
+            oled[_instance].setCursor( 0, ((SCREEN_HEIGHT - height) / 2)-_verOffset );
             return;
         default:
             // full center
-            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2)-horOffset, ((SCREEN_HEIGHT - height) / 2)-verOffset );
+            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2)-_horOffset, ((SCREEN_HEIGHT - height) / 2)-_verOffset );
             return;
      }
 }
