@@ -49,7 +49,7 @@ const uint8_t mcpHex (0x67);
 #endif
 
 // set the temp and output variables
-double _tInput = 0, _tSetPoint = 150, _Output = 0, _tGap = 0;
+double _tInput = 0, _tSetPoint = 0, _Output = 0, _tGap = 0;
 
 // Define the standard, aggressive, and conservative Tuning Parameters
 double Kp = 2.0, Ki = 5.0, Kd = 1.0;
@@ -57,16 +57,18 @@ double aggKp = 4.0, aggKi = 0.2, aggKd = 1.0;
 double consKp = 1.0, consKi = 0.05, consKd = 0.25;
 
 // set the time proportional settings
-const uint16_t _timeWindow = 5000; // ms
+const uint16_t _timeWindow = 1000; // ms
 uint16_t _timeStart;
 
 //Specify the links and initial tuning parameters
 //PID_v2 reflowPID(Kp, Ki, Kd, PID::Direct);
-//PID_v2 reflowPID(consKp, consKi, consKd, PID::Direct);
+PID_v2 reflowPID(consKp, consKi, consKd, PID::Direct);
+
+const uint8_t SW_DEBUG = true;
 
 void setup()
 {
-  Serial.begin(115200);
+    if (SW_DEBUG) Serial.begin(115200);
     _timeStart = millis();
 /*
     _i2c.begin(0x27, Wire);
@@ -78,9 +80,13 @@ void setup()
     // SSD1306_SWITCHCAPVCC = generate oled voltage from 3.3V internally
     // initiate the oleds and display thier number on the screen
     for (uint8_t x = 0; x < 2; x++) {
-        Serial.print(F("begin oled instance "));
-        Serial.println(String(x));
-        Serial.println(oled[x].begin(SSD1306_SWITCHCAPVCC, oAddr[x],false,true));
+        if (SW_DEBUG) Serial.print(F("begin oled instance "));
+        if (SW_DEBUG) Serial.println(String(x));
+        if (SW_DEBUG) {
+            Serial.println(oled[x].begin(SSD1306_SWITCHCAPVCC, oAddr[x],false,true));
+        } else {
+            oled[x].begin(SSD1306_SWITCHCAPVCC, oAddr[x],false,true);
+        }
         delay(2000);
         oled[x].clearDisplay();
         // remember the scale issue cause the GFX lib thinks it is 32 tall
@@ -96,7 +102,7 @@ void setup()
     
     //if ( not mcp.begin(mcpHex) ) { bitSet(vSystemFaultBit,eSysFaultBits::mcpFault); }
     if ( not mcp.begin(mcpHex) ) { 
-      Serial.print(F("mcp instance FAILED"));
+      if (SW_DEBUG) Serial.println(F("mcp instance FAILED"));
       while(1);
     }
     //mcp.begin(mcpHex);
@@ -106,54 +112,82 @@ void setup()
     mcp.enable(true);
 
     // tell the PID to range between 0 and the full window size
-//    reflowPID.SetOutputLimits(0, _timeWindow);
+    reflowPID.SetOutputLimits(0, _timeWindow);
 
     // get the first temp read after a delay of 1000ms to stabilize the thermocouple
-    // then start the PID with the parameters
     delay(1000);
     _tInput = mcp.readThermocouple();
-    
-//    reflowPID.Start(_tInput, _Output, _tSetPoint);
 
+    // set the first set point for testing
+    _tSetPoint = 25;
+    
+    // then start the PID with the parameters
+    reflowPID.Start(_tInput, _Output, _tSetPoint);
+    //reflowPID.SetMode(AUTOMATIC);
+/*
     // this is test code
     while(1) { 
         DisplayTemp("TEMP", String(mcp.readThermocouple()), 4, 3, 0);
         DisplayTemp("SETPOINT", String(_tInput+1800), 4, 3, 1);
         _tInput += 1.1;
     }
-
+*/
 }
 
 void loop()
 {
+    _tInput = mcp.readThermocouple();
+    _tGap = abs(reflowPID.GetSetpoint() - _tInput);
+    //_tGap = abs(_tSetPoint - _tInput);
+    if (SW_DEBUG) {
+        Serial.print(F("_tInput "));
+        Serial.print(String(_tInput));
+        Serial.print(F("\t_tGap "));
+        Serial.println(String(_tGap));
+    }
 
-//    _tInput = mcp.readThermocouple();
-//    _tGap = abs(reflowPID.GetSetpoint() - _tInput);
-
-//    if ( _tGap > 10 ) {
+    if ( _tGap < 10 ) {
         // we're close to setpoint, use conservative tuning parameters
-//        reflowPID.SetTunings(consKp, consKi, consKd);
-//    } else {
+        if (SW_DEBUG) Serial.println(F("Using conservative tuning parameters"));
+        reflowPID.SetTunings(consKp, consKi, consKd);
+    } else {
         // we're far from setpoint, use aggressive tuning parameters
-//        reflowPID.SetTunings(aggKp, aggKi, aggKd);
-//    }
+        if (SW_DEBUG) Serial.println(F("Using aggressive tuning parameters"));
+        reflowPID.SetTunings(aggKp, aggKi, aggKd);
+    }
 
-//    _Output = reflowPID.Run(_tInput);
+    _Output = reflowPID.Run(_tInput);
+    //reflowPID.Compute();
+    if (SW_DEBUG) {
+        Serial.print(F("_Output "));
+        Serial.print(String(_Output));
+        Serial.print(F("\_timeWindow "));
+        Serial.println(String(_timeWindow));
+    }
+
+    DisplayTemp("TEMP", String(_tInput), 4, 3, 0);
+    //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
+
     
     // adjust time until it is time
-    while (millis() - _timeStart > _timeWindow) {
+    while (millis() - _timeStart >= _timeWindow) {
         // time to shift the Relay Window
         _timeStart += _timeWindow;
     }
 
-    if (millis() - _timeStart >= _Output ) {
+    //if (millis() - _timeStart <= _Output ) {
+    if (_Output < millis() - _timeStart) {
             // heater on
 //            _i2c.digitalWrite(0,HIGH);
 //            _i2c.digitalWrite(1,HIGH);
+            DisplayTemp("OUTPUT", "ON", 4, 3, 1);
+            //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
     } else {
             // heater off
 //            _i2c.digitalWrite(0,LOW);
 //            _i2c.digitalWrite(1,LOW);
+            DisplayTemp("OUTPUT", "OFF", 4, 3, 1);
+            //DisplayTemp("OUTPUT", String(_Output), 4, 3, 1);
     }
 
 }
