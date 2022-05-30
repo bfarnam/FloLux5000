@@ -12,20 +12,24 @@ CA9500 _i2c;
 
 //#include <EEPROMEx.h>
 
-#include <Adafruit_SSD1306.h>
+#include "SSD1306.h"
 
-#define SCREEN_WIDTH 64
+#define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
 #define OLED_RESET    -1
 
 const uint8_t oAddr[2] = {0x3c, 0x3d};
 
-// The adafruit library is messed up and you can't substantiate two seperate oleds using the new constructors into an array
-Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
-// the workaround is to use the old constructor, but you can't set to 128x63 or it fails.
-// so the other workaround is to leave it set to 128x64 and then scale the fonts mannually x and y
-// and then you have to modify the library and manuualy set the i2c speed to 400k.... this cost me MANY hours to debug
+// The Adafruit library will create screen buffer PER oled screen of 128x64 = 1024 bytes (8192 bit)!  That's PER INSTANCE.
+// The 328p only has 2048 bytes to begin with.  This will fail.  So we define these as 64x32 (half size) so each buffer is 256 bytes or 512 total.
+// then use font scaling to recreate the 128x64 screen....
+//Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) };
+// the workaround is to use the old constructor
+// leave it set to 128x32 and then scale the fonts mannually x and y
+// and then you have to modify the library and manuualy set the i2c speed to 400k
 //Adafruit_SSD1306 oled[2] = { Adafruit_SSD1306(), Adafruit_SSD1306() };
+
+SSD1306 oled = SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // font x and y scaling
 uint8_t _tSizeX;
@@ -85,31 +89,30 @@ Serial.println( freeRam() );
     for (uint8_t x = 0; x < 2; x++) {
         if (SW_DEBUG) Serial.print(F("begin oled instance "));
         if (SW_DEBUG) Serial.println(String(x));
-        if (SW_DEBUG) {
-            Serial.println(oled[x].begin(SSD1306_SWITCHCAPVCC, oAddr[x],false,true));
-        } else {
-            oled[x].begin(SSD1306_SWITCHCAPVCC, oAddr[x],false,true);
-        }
-        delay(2000);
-        oled[x].clearDisplay();
-        // remember the scale issue cause the GFX lib thinks it is 32 tall
-        oled[x].setTextSize(12,2); //x,y x = hor y = ver
-        oled[x].setTextColor(SSD1306_WHITE);
-        oled[x].setCursor(0,0);
-        oledSetCursorCenterMode(String(x),x,0,0,16);
-        oled[x].print(String(x));
-        oled[x].display();
+        oled.begin(SSD1306_SWITCHCAPVCC, oAddr[x], false, false);
+        Serial.print(F("Free Ram after OLED is "));
+        Serial.println( freeRam() );
+        delay(1000);
+        oled.clearDisplay();
+        oled.setTextWrap(false);
+        // remember the scale
+        oled.setTextSize(6,2); //x,y x = hor y = ver
+        oled.setTextColor(SSD1306_WHITE);
+        oled.setCursor(0,0);
+        oledSetCursorCenterMode(String(x),x,0,0,0);
+        oled.println(String(x));
+        oled.display(oAddr[x]);
     }
     // give you time to read the numbers....
     delay(2000);
-Serial.print(F("Free Ram after OLED is "));
-Serial.println( freeRam() );
+
     //if ( not mcp.begin(mcpHex) ) { bitSet(vSystemFaultBit,eSysFaultBits::mcpFault); }
     if ( not mcp.begin(mcpHex) ) { 
       if (SW_DEBUG) Serial.println(F("mcp instance FAILED"));
       while(1);
+    } else {
+      if (SW_DEBUG) Serial.println(F("mcp found"));
     }
-    if (SW_DEBUG) Serial.println(F("mcp found"));
     
     //mcp.begin(mcpHex);
     mcp.setADCresolution(MCP9600_ADCRESOLUTION_18);
@@ -233,25 +236,25 @@ void heaterON(double _ouput, uint16_t _window)
 void DisplayTemp(String _banner, String _temp, uint8_t _sizeX, uint8_t _sizeY, uint8_t _instance) {
     _tSizeX = 3;
     _tSizeY = 1;
-    oled[_instance].clearDisplay();
+    oled.clearDisplay();
     // first set banner size and posisition
-    oled[_instance].setTextSize(_tSizeX,_tSizeY); //x,y x = hor y = ver
-    oled[_instance].setTextColor(SSD1306_WHITE);
-    oled[_instance].setCursor(0,0);
+    oled.setTextSize(_tSizeX,_tSizeY); //x,y x = hor y = ver
+    oled.setTextColor(SSD1306_WHITE);
+    oled.setCursor(0,0);
     // (string, instance, mode, horiz offset, vert offset)
     oledSetCursorCenterMode(_banner, _instance, 1);
-    oled[_instance].println(_banner);
+    oled.println(_banner);
     
     // now set temp display size and posisiton
     _tSizeX = _sizeX;
     _tSizeY = _sizeY;
-    oled[_instance].setTextSize(_tSizeX,_tSizeY); //x,y x = hor y = ver
+    oled.setTextSize(_tSizeX,_tSizeY); //x,y x = hor y = ver
     //oled[0].setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    oled[_instance].setTextColor(SSD1306_WHITE);
-    oled[_instance].setCursor(0,0);
+    oled.setTextColor(SSD1306_WHITE);
+    oled.setCursor(0,0);
     oledSetCursorCenterMode(String(_temp), _instance, 0, 0, 10);
-    oled[_instance].print(String(_temp));
-    oled[_instance].display();
+    oled.print(String(_temp));
+    oled.display(oAddr[_instance]);
 }
 
 // _text = text string (required)
@@ -266,29 +269,29 @@ void oledSetCursorCenterMode(String _text, uint8_t _instance, uint8_t _mode, int
     uint16_t height;
 
     // turn off wrap before finding L/R bounds
-    oled[_instance].setTextWrap(false);
-    oled[_instance].getTextBounds(_text, 0, 0, &x1, &y1, &width, &height);
+    oled.setTextWrap(false);
+    oled.getTextBounds(_text, 0, 0, &x1, &y1, &width, &height);
     // this will dynamically change the font smaller if too big to fit with no wrap
     while (width > SCREEN_WIDTH) {
         _tSizeX--;
-        oled[_instance].setTextSize(_tSizeX,_tSizeY);
-        oled[_instance].getTextBounds(_text, 0, 0, &x1, &y1, &width, &height);
+        oled.setTextSize(_tSizeX,_tSizeY);
+        oled.getTextBounds(_text, 0, 0, &x1, &y1, &width, &height);
     }
-    oled[_instance].setTextWrap(true);
+    //oled.setTextWrap(true);
 
     // set cursor so text is on horizontal and vertical centers minus any offset
     switch (_mode) {
         case 1:
             // horizontal only
-            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2) - _horizontalOffset, 0);
+            oled.setCursor( ((SCREEN_WIDTH - width) / 2) + _horizontalOffset, 0);
             return;
         case 2:
             // vertical only
-            oled[_instance].setCursor( 0, ((SCREEN_HEIGHT - height) / 2) - _verticalOffset );
+            oled.setCursor( 0, ((SCREEN_HEIGHT - height) / 2) - _verticalOffset );
             return;
         default:
             // full center
-            oled[_instance].setCursor( ((SCREEN_WIDTH - width) / 2) - _horizontalOffset, ((SCREEN_HEIGHT - height) / 2) - _verticalOffset );
+            oled.setCursor( ((SCREEN_WIDTH - width) / 2) + _horizontalOffset, ((SCREEN_HEIGHT - height) / 2) - _verticalOffset );
             return;
      }
 }
